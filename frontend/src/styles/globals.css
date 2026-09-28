@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans:
+    "Inter", "Geist", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", "SFMono-Regular", Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --background: hsl(210 40% 98%);
+  --foreground: hsl(222 47% 11%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 47% 11%);
+
+  --primary: hsl(222 47% 17%);
+  --primary-foreground: hsl(210 40% 98%);
+
+  --secondary: hsl(214 32% 95%);
+  --secondary-foreground: hsl(222 47% 20%);
+
+  --muted: hsl(214 32% 96%);
+  --muted-foreground: hsl(215 16% 47%);
+
+  --accent: hsl(214 32% 94%);
+  --accent-foreground: hsl(222 47% 20%);
+
+  --destructive: hsl(0 72% 51%);
+  --border: hsl(214 32% 90%);
+  --input: hsl(214 32% 87%);
+  --ring: hsl(222 47% 35%);
+}
+
+.dark {
+  --background: hsl(222 47% 7%);
+  --foreground: hsl(210 40% 96%);
+
+  --card: hsl(222 40% 10%);
+  --card-foreground: hsl(210 40% 96%);
+
+  --popover: hsl(222 40% 10%);
+  --popover-foreground: hsl(210 40% 96%);
+
+  --primary: hsl(210 40% 96%);
+  --primary-foreground: hsl(222 47% 12%);
+
+  --secondary: hsl(217 33% 17%);
+  --secondary-foreground: hsl(210 40% 96%);
+
+  --muted: hsl(217 33% 15%);
+  --muted-foreground: hsl(215 20% 65%);
+
+  --accent: hsl(217 33% 19%);
+  --accent-foreground: hsl(210 40% 96%);
+
+  --destructive: hsl(0 63% 45%);
+  --border: hsl(217 33% 20%);
+  --input: hsl(217 33% 25%);
+  --ring: hsl(215 20% 65%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  img,
+  svg {
+    display: block;
+  }
+
+  ::selection {
+    background-color: hsl(215 25% 80% / 0.6);
+    color: hsl(222 47% 11%);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
