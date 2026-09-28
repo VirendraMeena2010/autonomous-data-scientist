@@ -1,5 +1,6 @@
 const configuredBaseUrl =
-  import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8000";
+  import.meta.env.VITE_API_BASE_URL?.trim() ||
+  "http://localhost:8000";
 
 const normalizedBaseUrl = configuredBaseUrl.replace(/\/+$/, "");
 
@@ -14,7 +15,11 @@ export class ApiError extends Error {
   readonly status: number;
   readonly details: unknown;
 
-  constructor(status: number, message: string, details: unknown = null) {
+  constructor(
+    status: number,
+    message: string,
+    details: unknown = null,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
@@ -22,8 +27,14 @@ export class ApiError extends Error {
   }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+export function isRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
 }
 
 export function setAccessToken(token: string | null): void {
@@ -63,7 +74,10 @@ function getErrorMessage(status: number): string {
 function resolveUrl(path: string): string {
   const relativePath = path.replace(/^\/+/, "");
 
-  return new URL(relativePath, apiBaseUrl).toString();
+  return new URL(
+    relativePath,
+    apiBaseUrl,
+  ).toString();
 }
 
 function getFilename(
@@ -80,7 +94,11 @@ function getFilename(
 
   if (encodedMatch?.[1]) {
     try {
-      return decodeURIComponent(encodedMatch[1].trim().replace(/^"|"$/g, ""));
+      return decodeURIComponent(
+        encodedMatch[1]
+          .trim()
+          .replace(/^"|"$/g, ""),
+      );
     } catch {
       return fallback;
     }
@@ -90,7 +108,9 @@ function getFilename(
     /filename\s*=\s*(?:"([^"]+)"|([^;]+))/i,
   );
 
-  const filename = regularMatch?.[1] ?? regularMatch?.[2]?.trim();
+  const filename =
+    regularMatch?.[1] ??
+    regularMatch?.[2]?.trim();
 
   return filename || fallback;
 }
@@ -102,7 +122,8 @@ async function parseResponse(
     return undefined;
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
+  const contentType =
+    response.headers.get("content-type") ?? "";
 
   if (contentType.includes("application/json")) {
     try {
@@ -125,20 +146,34 @@ export async function apiRequest<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(init.headers);
-  const isFormData = init.body instanceof FormData;
 
-  if (init.body !== undefined && !isFormData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+  const isFormData =
+    init.body instanceof FormData;
+
+  if (
+    init.body !== undefined &&
+    !isFormData &&
+    !headers.has("Content-Type")
+  ) {
+    headers.set(
+      "Content-Type",
+      "application/json",
+    );
   }
 
   if (!headers.has("Accept")) {
-    headers.set("Accept", "application/json");
+    headers.set(
+      "Accept",
+      "application/json",
+    );
   }
 
   if (accessToken) {
     headers.set(
       "Authorization",
-      accessToken.toLowerCase().startsWith("bearer ")
+      accessToken
+        .toLowerCase()
+        .startsWith("bearer ")
         ? accessToken
         : `Bearer ${accessToken}`,
     );
@@ -147,15 +182,21 @@ export async function apiRequest<T>(
   let response: Response;
 
   try {
-    response = await fetch(resolveUrl(path), {
-      ...init,
-      headers,
-      credentials: "include",
-    });
+    response = await fetch(
+      resolveUrl(path),
+      {
+        ...init,
+        headers,
+        credentials: "include",
+      },
+    );
   } catch (error: unknown) {
     if (
       error instanceof DOMException &&
-      (error.name === "AbortError" || error.name === "TimeoutError")
+      (
+        error.name === "AbortError" ||
+        error.name === "TimeoutError"
+      )
     ) {
       throw error;
     }
@@ -184,7 +225,9 @@ export interface ApiDownload {
   filename: string;
 }
 
-export async function apiDownload(path: string): Promise<ApiDownload> {
+export async function apiDownload(
+  path: string,
+): Promise<ApiDownload> {
   const headers = new Headers({
     Accept: "*/*",
   });
@@ -192,7 +235,9 @@ export async function apiDownload(path: string): Promise<ApiDownload> {
   if (accessToken) {
     headers.set(
       "Authorization",
-      accessToken.toLowerCase().startsWith("bearer ")
+      accessToken
+        .toLowerCase()
+        .startsWith("bearer ")
         ? accessToken
         : `Bearer ${accessToken}`,
     );
@@ -201,14 +246,20 @@ export async function apiDownload(path: string): Promise<ApiDownload> {
   let response: Response;
 
   try {
-    response = await fetch(resolveUrl(path), {
-      headers,
-      credentials: "include",
-    });
+    response = await fetch(
+      resolveUrl(path),
+      {
+        headers,
+        credentials: "include",
+      },
+    );
   } catch (error: unknown) {
     if (
       error instanceof DOMException &&
-      (error.name === "AbortError" || error.name === "TimeoutError")
+      (
+        error.name === "AbortError" ||
+        error.name === "TimeoutError"
+      )
     ) {
       throw error;
     }
