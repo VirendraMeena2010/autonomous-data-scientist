@@ -1,6 +1,9 @@
+
 from __future__ import annotations
+
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
+
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +24,9 @@ from app.services.queue import AnalysisQueue
 from app.services.storage import StorageService
 from app.telemetry import init_telemetry
 
+
 configure_logging(settings.environment)
+
 logger = structlog.get_logger()
 
 
@@ -32,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ---------------------------------------------------------
     app.state.storage = StorageService(settings)
     await app.state.storage.initialize()
-    
+
     # ---------------------------------------------------------
     # Analysis queue
     # ---------------------------------------------------------
@@ -54,8 +59,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # LangGraph checkpointer
     # ---------------------------------------------------------
     #
-    # SQLAlchemy uses:
+    # SQLAlchemy may use:
     #   postgresql+asyncpg://...
+    #   postgresql+psycopg://...
     #
     # Psycopg / LangGraph expects:
     #   postgresql://...
@@ -68,6 +74,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "postgresql://",
             1,
         )
+    elif database_url.startswith("postgresql+psycopg://"):
+        database_url = database_url.replace(
+            "postgresql+psycopg://",
+            "postgresql://",
+            1,
+        )
 
     checkpointer_context = AsyncPostgresSaver.from_conn_string(
         database_url
@@ -77,7 +89,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await checkpointer_context.__aenter__()
     )
 
-    # Create LangGraph's checkpoint tables if needed.
+    # Create LangGraph checkpoint tables if needed.
     await app.state.analysis_checkpointer.setup()
 
     # ---------------------------------------------------------
@@ -113,7 +125,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # LangGraph checkpointer
         # -----------------------------------------------------
         if hasattr(app.state, "analysis_checkpointer"):
-            await checkpointer_context.__aexit__(None, None, None)
+            await checkpointer_context.__aexit__(
+                None,
+                None,
+                None,
+            )
 
         # -----------------------------------------------------
         # Storage
@@ -134,7 +150,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
 init_telemetry(app)
+
 
 # ---------------------------------------------------------
 # Security headers
@@ -142,10 +160,12 @@ init_telemetry(app)
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
+
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "no-referrer"
+
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(), geolocation=()"
     )
@@ -160,6 +180,7 @@ async def security_headers(request: Request, call_next):
 
     return response
 
+
 # ---------------------------------------------------------
 # CORS
 # ---------------------------------------------------------
@@ -171,6 +192,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ---------------------------------------------------------
 # API routers
 # ---------------------------------------------------------
@@ -178,34 +200,42 @@ app.include_router(
     auth.router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     admin_router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     projects.router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     datasets.router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     analyses.router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     health_router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     audit_logs_router,
     prefix=settings.api_prefix,
 )
+
 app.include_router(
     queue_dashboard_router,
     prefix=settings.api_prefix,
 )
+
 
 # ---------------------------------------------------------
 # Root
@@ -221,6 +251,7 @@ async def root() -> dict[str, str]:
         "docs": f"{settings.api_prefix}/docs",
     }
 
+
 # ---------------------------------------------------------
 # Liveness
 # ---------------------------------------------------------
@@ -233,6 +264,7 @@ async def live() -> dict[str, str]:
         "status": "live",
         "version": "0.1.0",
     }
+
 
 # ---------------------------------------------------------
 # Readiness
@@ -248,7 +280,7 @@ async def ready(
     try:
         # Database
         await session.execute(text("SELECT 1"))
-        
+
         # Redis / analysis queue is optional
         if request.app.state.analysis_queue is not None:
             await request.app.state.analysis_queue.ping()
@@ -265,3 +297,4 @@ async def ready(
     return {
         "status": "ready",
     }
+
