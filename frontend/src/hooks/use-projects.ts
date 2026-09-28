@@ -3,7 +3,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-
 import * as projectsApi from "@/api/projects";
 import type {
   CreateProjectInput,
@@ -36,9 +35,13 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: CreateProjectInput) => projectsApi.createProject(input),
+    mutationFn: (input: CreateProjectInput) =>
+      projectsApi.createProject(input),
+
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["projects"],
+      });
     },
   });
 }
@@ -47,12 +50,17 @@ export function useDeleteProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (projectId: string) => projectsApi.deleteProject(projectId),
-    onSuccess: (deletedProjectId: string) => {
+    mutationFn: (projectId: string) =>
+      projectsApi.deleteProject(projectId),
+
+    onSuccess: (_, deletedProjectId) => {
       queryClient.removeQueries({
         queryKey: ["projects", deletedProjectId],
       });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+
+      void queryClient.invalidateQueries({
+        queryKey: ["projects"],
+      });
     },
   });
 }
