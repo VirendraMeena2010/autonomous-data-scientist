@@ -56,7 +56,7 @@ class Settings(BaseSettings):
 
     nemo_guardrails_enabled: bool = False
     nemo_guardrails_config_dir: Path = Path("guardrails")
-
+    cors_allow_credentials: bool = True
     cors_origins: Annotated[
         tuple[str, ...],
         NoDecode,
