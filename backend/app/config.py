@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_name: str = "Autonomous Data Scientist"
     environment: str = "development"
     api_prefix: str = "/api/v1"
-
+    database_url: str
     # ---------------------------------------------------------
     # CORS
     # ---------------------------------------------------------
