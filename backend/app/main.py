@@ -58,14 +58,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # ---------------------------------------------------------
     # LangGraph checkpointer
     # ---------------------------------------------------------
-    #
-    # SQLAlchemy may use:
-    #   postgresql+asyncpg://...
-    #   postgresql+psycopg://...
-    #
-    # Psycopg / LangGraph expects:
-    #   postgresql://...
-    #
     database_url = settings.database_url
 
     if database_url.startswith("postgresql+asyncpg://"):
@@ -113,7 +105,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     try:
         yield
-
     finally:
         # -----------------------------------------------------
         # Analysis queue
@@ -158,14 +149,16 @@ init_telemetry(app)
 # Security headers
 # ---------------------------------------------------------
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
+async def security_headers(
+    request: Request,
+    call_next,
+):
     response = await call_next(request)
 
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "no-referrer"
-
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(), geolocation=()"
     )
@@ -297,4 +290,3 @@ async def ready(
     return {
         "status": "ready",
     }
-
