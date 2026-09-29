@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from typing import Literal
 
@@ -12,7 +11,16 @@ class Settings(BaseSettings):
     app_name: str = "Autonomous Data Scientist"
     environment: str = "development"
     api_prefix: str = "/api/v1"
-    database_url: str
+
+    # ---------------------------------------------------------
+    # Database
+    # ---------------------------------------------------------
+    database_url: str = ""
+    database_pool_size: int = 5
+    database_max_overflow: int = 10
+    database_pool_timeout: int = 30
+    database_pool_recycle: int = 1800
+
     # ---------------------------------------------------------
     # CORS
     # ---------------------------------------------------------
@@ -21,7 +29,6 @@ class Settings(BaseSettings):
         "http://localhost:3000,"
         "https://autonomous-data-scientist-two.vercel.app"
     )
-
     cors_allow_credentials: bool = True
 
     @property
@@ -36,7 +43,6 @@ class Settings(BaseSettings):
     # Storage
     # ---------------------------------------------------------
     storage_backend: Literal["local", "s3"] = "local"
-
     local_storage_path: Path = Path("/data/uploads")
 
     # ---------------------------------------------------------
@@ -45,7 +51,6 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = ""
     s3_bucket_name: str = "aidatascientist"
     s3_region: str = "ap-northeast-2"
-
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
 
