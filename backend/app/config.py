@@ -106,10 +106,13 @@ class Settings(BaseSettings):
     # =========================================================
     # Antivirus
     # =========================================================
+    # =========================================================
+# Antivirus
+# =========================================================
     antivirus_enabled: bool = False
     antivirus_host: str = "clamav"
     antivirus_port: int = 3310
-    antivirus_timeout: int = 30
+    antivirus_timeout_seconds: int = 30
 
     # =========================================================
     # Worker / Analysis
