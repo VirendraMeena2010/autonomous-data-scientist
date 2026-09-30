@@ -1,6 +1,6 @@
-
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
@@ -73,95 +73,56 @@ async def run_analysis_directly(
         # ---------------------------------------------------------
         # 1. Get LangGraph
         # ---------------------------------------------------------
-
         graph = request.app.state.analysis_graph
 
         # ---------------------------------------------------------
-        # 2. Download dataset from object storage
+        # 2. Resolve dataset from storage
         # ---------------------------------------------------------
+        # IMPORTANT:
+        # Do NOT call storage.local_path() directly here.
+        # storage.local_path() only works when STORAGE_BACKEND=local
+        # When STORAGE_BACKEND=s3, the dataset must first be
+        # downloaded from object storage into a temporary local path.
+        # ---------------------------------------------------------
+        temp_dir = Path(tempfile.gettempdir()) / "autonomous-data-scientist" / str(analysis.id)
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
-        temporary_path = Path(
-            storage.local_path(
-                f"analysis/{analysis.id}/{dataset.original_filename}"
-            )
-        )
-
-        temporary_path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        await storage.download_file(
-            dataset.stored_path,
-            temporary_path,
-        )
+        if storage.backend == "local":
+            temporary_path = storage.local_path(dataset.stored_path)
+        else:
+            temporary_path = temp_dir / Path(dataset.original_filename).name
+            await storage.download_file(dataset.stored_path, temporary_path)
 
         # ---------------------------------------------------------
         # 3. Build JSON-safe metadata
         # ---------------------------------------------------------
-
-        raw_metadata = getattr(
-            dataset,
-            "dataset_metadata",
-            None,
-        )
-
-        if isinstance(raw_metadata, dict):
-            dataset_metadata = dict(raw_metadata)
-        else:
-            dataset_metadata = {}
+        raw_metadata = getattr(dataset, "dataset_metadata", None)
+        dataset_metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
 
         dataset_metadata.update(
             {
                 "filename": str(dataset.original_filename),
-                "original_filename": str(
-                    dataset.original_filename
-                ),
-                "media_type": (
-                    str(dataset.media_type)
-                    if dataset.media_type is not None
-                    else None
-                ),
-                "size_bytes": (
-                    int(dataset.size_bytes)
-                    if dataset.size_bytes is not None
-                    else None
-                ),
-                "row_count": (
-                    int(dataset.row_count)
-                    if dataset.row_count is not None
-                    else None
-                ),
-                "column_count": (
-                    int(dataset.column_count)
-                    if dataset.column_count is not None
-                    else None
-                ),
-                "status": (
-                    str(dataset.status)
-                    if dataset.status is not None
-                    else None
-                ),
+                "original_filename": str(dataset.original_filename),
+                "media_type": str(dataset.media_type) if dataset.media_type is not None else None,
+                "size_bytes": int(dataset.size_bytes) if dataset.size_bytes is not None else None,
+                "row_count": int(dataset.row_count) if dataset.row_count is not None else None,
+                "column_count": int(dataset.column_count) if dataset.column_count is not None else None,
+                "status": str(dataset.status) if dataset.status is not None else None,
             }
         )
 
         # ---------------------------------------------------------
         # 4. Build LangGraph state
         # ---------------------------------------------------------
-
         initial_state = {
             "analysis_id": str(analysis.id),
             "project_id": str(analysis.project_id),
             "dataset_id": str(analysis.dataset_id),
             "question": str(analysis.question),
-
-            # IMPORTANT:
             # This is now a real local filesystem path.
             "dataset_path": str(temporary_path),
-
             # Only JSON-safe values.
             "dataset_metadata": dataset_metadata,
-
             "plan": None,
             "profile": None,
             "quality": None,
@@ -177,7 +138,6 @@ async def run_analysis_directly(
         # ---------------------------------------------------------
         # 5. LangGraph configuration
         # ---------------------------------------------------------
-
         config = {
             "configurable": {
                 "thread_id": str(analysis.id),
@@ -187,39 +147,26 @@ async def run_analysis_directly(
         # ---------------------------------------------------------
         # 6. Execute graph
         # ---------------------------------------------------------
-
-        result = await graph.ainvoke(
-            initial_state,
-            config=config,
-        )
+        result = await graph.ainvoke(initial_state, config=config)
 
         # ---------------------------------------------------------
         # 7. Persist graph results
         # ---------------------------------------------------------
-
         analysis.plan = result.get("plan")
         analysis.profile = result.get("profile")
         analysis.quality = result.get("quality")
         analysis.findings = result.get("findings")
         analysis.report = result.get("report")
-
         analysis.guardrail = result.get("guardrail")
 
-        report_guardrail = result.get(
-            "report_guardrail"
-        )
-
+        report_guardrail = result.get("report_guardrail")
         if report_guardrail is not None:
             analysis.guardrail = report_guardrail
 
-        analysis.langfuse_trace_id = result.get(
-            "langfuse_trace_id"
-        )
+        analysis.langfuse_trace_id = result.get("langfuse_trace_id")
 
-        # IMPORTANT:
-        # Your enum defines SUCCEEDED, not COMPLETED.
+        # IMPORTANT: Enum defines SUCCEEDED, not COMPLETED.
         analysis.status = AnalysisStatusEnum.SUCCEEDED.value
-
         analysis.finished_at = utc_now()
         analysis.error_message = None
 
@@ -230,35 +177,24 @@ async def run_analysis_directly(
         # ---------------------------------------------------------
         # 8. Persist failure
         # ---------------------------------------------------------
-
         analysis.status = AnalysisStatusEnum.FAILED.value
         analysis.error_message = str(exc)
         analysis.finished_at = utc_now()
 
         await session.commit()
         await session.refresh(analysis)
-
         raise
 
     finally:
         # ---------------------------------------------------------
         # 9. Remove temporary dataset
         # ---------------------------------------------------------
-
         if temporary_path is not None:
             try:
-                temporary_path.unlink(
-                    missing_ok=True
-                )
-
+                temporary_path.unlink(missing_ok=True)
                 parent = temporary_path.parent
-
-                if (
-                    parent.exists()
-                    and not any(parent.iterdir())
-                ):
+                if parent.exists() and not any(parent.iterdir()):
                     parent.rmdir()
-
             except OSError:
                 pass
 
@@ -278,27 +214,14 @@ async def create_analysis_endpoint(
     # ---------------------------------------------------------
     # 1. Verify project ownership
     # ---------------------------------------------------------
-
-    project = await require_project_owner(
-        session,
-        project_id,
-        user.id,
-    )
+    project = await require_project_owner(session, project_id, user.id)
 
     # ---------------------------------------------------------
     # 2. Get dataset belonging to project
     # ---------------------------------------------------------
+    dataset = await get_dataset_for_project(session, project_id, payload.dataset_id)
 
-    dataset = await get_dataset_for_project(
-        session,
-        project_id,
-        payload.dataset_id,
-    )
-
-    if (
-        dataset is None
-        or dataset.owner_id != user.id
-    ):
+    if dataset is None or dataset.owner_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="dataset_not_found",
@@ -307,25 +230,17 @@ async def create_analysis_endpoint(
     # ---------------------------------------------------------
     # 3. Get storage service
     # ---------------------------------------------------------
-
-    storage = getattr(
-        request.app.state,
-        "storage",
-        None,
-    )
+    storage = getattr(request.app.state, "storage", None)
 
     if storage is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_503_SERVICE_UNAVAILABLE
-            ),
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="storage_not_initialized",
         )
 
     # ---------------------------------------------------------
     # 4. Create analysis record
     # ---------------------------------------------------------
-
     analysis = AnalysisModel(
         project_id=project.id,
         dataset_id=str(payload.dataset_id),
@@ -336,14 +251,12 @@ async def create_analysis_endpoint(
     )
 
     session.add(analysis)
-
     await session.commit()
     await session.refresh(analysis)
 
     # ---------------------------------------------------------
     # 5. Execute analysis
     # ---------------------------------------------------------
-
     try:
         await run_analysis_directly(
             analysis=analysis,
@@ -352,10 +265,8 @@ async def create_analysis_endpoint(
             request=request,
             storage=storage,
         )
-
     except Exception:
-        # The analysis record already contains
-        # the actual failure.
+        # The analysis record already contains the actual failure.
         pass
 
     return analysis
@@ -369,24 +280,11 @@ async def list_analyses_endpoint(
     project_id: UUID,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
-    limit: int = Query(
-        50,
-        ge=1,
-        le=100,
-    ),
-    offset: int = Query(
-        0,
-        ge=0,
-    ),
-    status_filter: AnalysisStatusEnum | None = Query(
-        default=None,
-    ),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    status_filter: AnalysisStatusEnum | None = Query(default=None),
 ):
-    await require_project_owner(
-        session,
-        project_id,
-        user.id,
-    )
+    await require_project_owner(session, project_id, user.id)
 
     query = (
         select(AnalysisModel)
@@ -403,16 +301,10 @@ async def list_analyses_endpoint(
     )
 
     if status_filter is not None:
-        query = query.where(
-            AnalysisModel.status
-            == status_filter.value
-        )
+        query = query.where(AnalysisModel.status == status_filter.value)
 
     result = await session.execute(query)
-
-    return list(
-        result.scalars().all()
-    )
+    return list(result.scalars().all())
 
 
 @router.post(
@@ -425,12 +317,7 @@ async def cancel_analysis_endpoint(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ):
-    analysis = await require_analysis_owner(
-        session,
-        project_id,
-        analysis_id,
-        user.id,
-    )
+    analysis = await require_analysis_owner(session, project_id, analysis_id, user.id)
 
     if analysis.status not in {
         AnalysisStatusEnum.QUEUED.value,
@@ -441,14 +328,8 @@ async def cancel_analysis_endpoint(
             detail="analysis_not_cancelable",
         )
 
-    analysis.status = (
-        AnalysisStatusEnum.CANCELLED.value
-    )
-
-    analysis.error_message = (
-        "cancelled_by_user"
-    )
-
+    analysis.status = AnalysisStatusEnum.CANCELLED.value
+    analysis.error_message = "cancelled_by_user"
     analysis.finished_at = utc_now()
 
     await session.commit()
@@ -463,34 +344,18 @@ async def cancel_analysis_endpoint(
 async def export_analysis_endpoint(
     project_id: UUID,
     analysis_id: UUID,
-    export_format: Literal[
-        "json",
-        "markdown",
-    ] = Query("json"),
+    export_format: Literal["json", "markdown"] = Query("json"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> Response:
-    analysis = await require_analysis_owner(
-        session,
-        project_id,
-        analysis_id,
-        user.id,
-    )
-
-    content, media_type, filename = (
-        render_analysis_export(
-            analysis,
-            export_format,
-        )
-    )
+    analysis = await require_analysis_owner(session, project_id, analysis_id, user.id)
+    content, media_type, filename = render_analysis_export(analysis, export_format)
 
     return Response(
         content=content,
         media_type=media_type,
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{filename}"'
-            ),
+            "Content-Disposition": f'attachment; filename="{filename}"',
         },
     )
 
@@ -505,10 +370,4 @@ async def get_analysis_endpoint(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ):
-    return await require_analysis_owner(
-        session,
-        project_id,
-        analysis_id,
-        user.id,
-    )
-
+    return await require_analysis_owner(session, project_id, analysis_id, user.id)
