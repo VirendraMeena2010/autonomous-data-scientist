@@ -74,7 +74,7 @@ async def stage_uploaded_dataset(
 
     if (
         suffix
-        not in settings.allowed_dataset_extensions
+        not in settings.dataset_extensions_list
     ):
         raise UnsupportedDatasetError(
             "unsupported_dataset_extension"
